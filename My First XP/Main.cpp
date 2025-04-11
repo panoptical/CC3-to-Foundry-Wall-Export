@@ -1,8 +1,8 @@
 #include "Main.h"
 
 
-char CList[] = "DEMO\0TESTNEWFUNCTIONS\0EXPORTWALLS\0EXPORTWALLMAP\0";
-PCMDPROC PList[] = { About, Demo, TestNewFunctions, ExportWalls, ExportRect };
+char CList[] = "DEMO\0TESTNEWFUNCTIONS\0EXPORTWALLS\0EXPORTWALLMAP\0BB\0\0";
+PCMDPROC PList[] = { About, Demo, TestNewFunctions, ExportWalls, ExportRect, GetBB };
 
 XP MyXP = { 0, CList, PList, 0, 0, 0, XPID, 0, 620, 0, 0, 620 };
 
@@ -85,6 +85,37 @@ void XPCALL TestNewFunctions() {
 	CmdEnd();    
 }
 
+//function to troubleshoot bounding box request
+//
+
+GLINE2 boundingbox;
+
+void XPCALL GetBB(void) {
+	FORMST(BBPrompt, "Select Lower Left, then Upper Right.\0")
+
+		RDATA BBReq =
+	{ sizeof(RDATA), RD_Win, NULL, RDF_C, (DWORD*)&boundingbox,
+		(DWORD*)&BBPrompt,RDC_XH, MSGBB, NULL, NULL, 0, NULL, 0 };
+
+	ReqData(&BBReq);
+}
+
+void XPCALL MSGBB(const int Result, int Result2, int Result3)
+{
+	if (Result != X_OK) { CmdEnd(); return; }
+	UNREFERENCED_PARAMETER(Result2);
+	UNREFERENCED_PARAMETER(Result3);
+
+	FORMSTPKT(BBFPkt, "(!01)\n(!02)\0", 2)
+		ITEMFMT(boundingbox.p1, FT_2dC4, FJ_Var, 1, 0)
+		ITEMFMT(boundingbox.p2, FT_2dC4, FJ_Var, 1, 0)
+		FORMSTEND
+
+		FormSt(&BBFPkt, RSC(FD_MsgBox));
+	CmdEnd();
+}
+
+
 std::string wallsJSON = "";
 int feetToPixels = 20; //to do: check for this programmatically
 int p1x, p1y, p2x, p2y;
@@ -95,19 +126,42 @@ int wlnr = 0;
 //stores the extent of the map grid. p1 = lower left, p2 = upper right
 GLINE3 GridExt;
 
+
 //function based on extent function in https://rpgmaps.profantasy.com/developing-add-ons-for-cc3-part-7-dynamic-dungeon-tools-3/
 //get grid entity
 //calculate extent
-void FindGridExt() {
+//this is very janky - just let the user define the box
+//
+void XPCALL FindGridExt() {
+	//old code - didn't work right
 	BgnPExtents();
 	DLScan(NULL, FindGridEntities, DLS_UNLK | DLS_HSHTOK | DLS_NOWDC | DLS_RO, 0, 0);
 	EndPExtents(&GridExt);
+
+	
+
+
+
+
 }
+
+void XPCALL HandleExc(const int Result, int Result2, int Result3)
+{
+	if (Result != X_OK) { CmdEnd(); return; }
+	UNREFERENCED_PARAMETER(Result2);
+	UNREFERENCED_PARAMETER(Result3);
+
+	CmdEnd();
+}
+
+
 
 // Finds all entities that are on the GRID layer for the extents check
 pENTREC XPCALL FindGridEntities(hDLIST list, pENTREC entity, const DWORD parm1, DWORD parm2) {
 
 	int layer = GetLayerNr("HEX/SQUARE GRID");
+	//int layer = GetLayerNr("BACKGROUND (MAP)");
+	//int layer = GetLayerNr("MAP BORDER");
 
 	if (entity->CStuff.ELayer == layer) {
 		EXCheck(entity);
@@ -285,14 +339,24 @@ void ProcessWallEntity(const pENTREC entity) {
 	//debug: just record the wall and its tag
 	//wallsJSON.append("\nSorry to cut in but I've found a wall enttiy with tag ");
 	//wallsJSON.append(std::to_string(entity->CStuff.Tag));
-	for (int i = 0; i < entity->Path.Path.Count; i++) {
-		//construct the ith wall
-		MakeWall(entity, i, i + 1);
-	}
-	if (entity->Path.Path.Count == entity->Path.Path.EParm) //if it's closed
+	if (entity->Path.Path.Count > 0) //make sure it's not empty
 	{
-		MakeWall(entity, 0, entity->Path.Path.Count);
+		for (int i = 0; i < entity->Path.Path.Count -1; i++) {
+			//construct the ith wall
+			MakeWall(entity, i, i + 1);
+		}
+		if (entity->Path.Path.Count == entity->Path.Path.EParm) //if it's closed
+		{
+			MakeWall(entity, 0, entity->Path.Path.Count);
+		}
 	}
+	//testing:
+	// this currently works when all the walls are PATH or POLYGON
+	// There are also:
+	// LINE
+	// ARC
+	// MULTIPOLY
+	//
 }
 
 void MakeWall(const pENTREC entity, int node1, int node2) {
