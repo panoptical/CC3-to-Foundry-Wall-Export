@@ -100,7 +100,10 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="fileio.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="MapExport.cpp" />
+    <ClCompile Include="random.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Main.h" />

@@ -10,6 +10,7 @@
 
 void XPCALL About(void);
 void XPCALL Demo(void);
+void XPCALL ToFoundry(void);
 void XPCALL TestNewFunctions(void);
 void XPCALL ExportWalls(void);
 void XPCALL AppendSceneName(void);
