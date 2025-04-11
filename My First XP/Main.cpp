@@ -93,6 +93,9 @@ int widthFeet, heightFeet, widthPixels, heightPixels;
 //stores the extent of the map grid. p1 = lower left, p2 = upper right
 GLINE3 GridExt;
 
+//function based on extent function in https://rpgmaps.profantasy.com/developing-add-ons-for-cc3-part-7-dynamic-dungeon-tools-3/
+//get grid entity
+//calculate extent
 void FindGridExt() {
 	BgnPExtents();
 	DLScan(NULL, FindGridEntities, DLS_UNLK | DLS_HSHTOK | DLS_NOWDC | DLS_RO, 0, 0);
@@ -111,27 +114,36 @@ pENTREC XPCALL FindGridEntities(hDLIST list, pENTREC entity, const DWORD parm1, 
 	return 0;
 }
 
+//Sets the parameters for exporting walls and map images
+// basically all we need now is a bounding box for the part of the map that's on the grid
+// this will be what we export as an image and also what we use to calculate the wall positions in Foundry
 void SetParameters() {
-	//get grid entity
-	//calculate extent
+
 	FindGridExt();
 	widthFeet = GridExt.p2.x - GridExt.p1.x;
 	heightFeet = GridExt.p2.y - GridExt.p1.y;
 	widthPixels = widthFeet * feetToPixels;
 	heightPixels = heightFeet * feetToPixels;
-	//why is this coming out to 84x8???
 }
 
 void XPCALL ExportWalls() {
-	SetParameters();
-	AppendSceneName();
-	wallsJSON.append("  \"walls\": [");
-	std::string filePath = GetSaveFilePath();
-	if (!filePath.empty()) {
-		wallsJSON.append(GetWallsJSON());
-		wallsJSON.pop_back();
-		wallsJSON.append("]\n}");
-		SaveTextToFile(filePath, wallsJSON);
+	
+	std::string filePath = GetSaveFilePath();	//prompt user to choose an export file name and path
+													
+	if (!filePath.empty()) {					//if they selected one, proceed with the export	
+
+		wallsJSON = "";							//ensure holder for JSON is empty at the start
+		
+		SetParameters();						//calculates and sets parameters which determine height, width, scale, etc. of wall canvas
+		AppendSceneName();						//adds beginning matter to wallsJSON (scene name, height, width, scale)
+		
+		wallsJSON.append("  \"walls\": [");		//start the walls entry
+		wallsJSON.append(GetWallsJSON());		//add a comma-separated list of all walls, with terminal comma
+		wallsJSON.pop_back();					//remove the terminal comma
+		wallsJSON.append("]\n}");				//add the end of the walls array and the JSON object
+		
+		SaveTextToFile(filePath, wallsJSON);	//write the file
+												//inform the user:
 		FORMST(MyAPkt, "Success\n\n"
 			"File saved successfully."
 		)
@@ -143,7 +155,6 @@ void XPCALL ExportWalls() {
 		)
 			FormSt(&MyAPkt, RSC(FD_MsgBox));
 		// Handle the case where the user cancels the file save dialog
-		// You can show a message or take any other action as needed
 	}
 
 	CmdEnd();
@@ -151,7 +162,14 @@ void XPCALL ExportWalls() {
 
 
 
-
+//Exports the current map
+// uses the export jpeg rectangle function to export only a selected rectangle
+// We only want to export what's on the grid so our map will match up with the grid on the VTT
+// So we use SetParameters to assign values to GridExt:
+//  GridExt.p1 is the lower left point of the grid
+//  GridExt.p2 is the upper right point of the grid
+// Then we format the command as a string, cast it as a cstring, and call it
+//
 void XPCALL ExportRect() {
 	SetParameters();
 	//need to compose the command as a string
@@ -197,7 +215,9 @@ void XPCALL AppendSceneName()
 
 
 //the main function where we're going to have to find the walls
-//to do: scan the drawing list for walls
+//must return a correctly formatted JSON list of all the walls
+// This is a comma-separated list
+// to do: scan the drawing list for walls
 //  - walls are stored with sets of nodes
 //  - call GetWallText on each pair of nodes
 //  - append to result
@@ -217,6 +237,9 @@ std::string GetWallsJSON() {
 
 	return result;
 }
+
+
+
 
 //GetWallText
 //Given x and y coordinates of a wall, returns a string containining a correctly formatted entry for a walls array in Foundry json format
