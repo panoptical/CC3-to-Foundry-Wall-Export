@@ -36,18 +36,13 @@ char name[50];
 
 //boundingbox: holds the user-selected bounding box
 GLINE2 boundingbox;
-
-//stores the extent of the map grid. p1 = lower left, p2 = upper right
-GLINE3 GridExt;
+int widthFeet, heightFeet, widthPixels, heightPixels; //derived values, to be calculated from boundingbox
+int feetToPixels = 20; // scaling factor for 5 foot squares = 100pixel squares on Foundry. To do: maybe put this in a settings dialog or something
+int wlnr = 0; //this will hold the number of the walls layer later
 
 //wallsJSON: holds the JSON code for the walls
 std::string wallsJSON = "";
 
-
-int feetToPixels = 20; //to do: maybe put this in a settings dialog or something
-int p1x, p1y, p2x, p2y;
-int widthFeet, heightFeet, widthPixels, heightPixels;
-int wlnr = 0; //this will hold the number of the walls layer later
 
 
 
@@ -55,8 +50,7 @@ int wlnr = 0; //this will hold the number of the walls layer later
 //----------------essentially the main function-------------------//
 
 void XPCALL ToFoundry(void) {
-	GetBB(); //get the bounding box from the user
-	//SetParameters(); //will I still need this or can I handle it once with GetBB?
+	GetBB(); //calls GetBB, then loads its results into our parameters
 	//ExportWalls();
 	//ExportRect();
 
@@ -90,62 +84,24 @@ void XPCALL MSGBB(const int Result, int Result2, int Result3)
 	UNREFERENCED_PARAMETER(Result2);
 	UNREFERENCED_PARAMETER(Result3);
 
+	widthFeet = boundingbox.p2.x - boundingbox.p1.x;
+	heightFeet = boundingbox.p2.y - boundingbox.p1.y;
+	widthPixels = widthFeet * feetToPixels;
+	heightPixels = heightFeet * feetToPixels;
+
 	FORMSTPKT(BBFPkt, "(!01)\n(!02)\0", 2)
 		ITEMFMT(boundingbox.p1, FT_2dC4, FJ_Var, 1, 0)
 		ITEMFMT(boundingbox.p2, FT_2dC4, FJ_Var, 1, 0)
 		FORMSTEND
 
 		FormSt(&BBFPkt, RSC(FD_MsgBox));
+
+	ExportWalls();
+
+	ExportRect();
+	
 	CmdEnd();
 }
-
-
-//////////--------------FindGridExt--------------/////////////
-//
-// this ended up being a poor approach
-// in the process of refactoring it to just use a user-selected bounding box, which will snap to the grid,
-//  for exporting both the walls.json and map.png
-// only called from SetParameters
-//
-
-
-//function based on extent function in https://rpgmaps.profantasy.com/developing-add-ons-for-cc3-part-7-dynamic-dungeon-tools-3/
-//get grid entity
-//calculate extent
-//this is very janky - just let the user define the box
-//
-void XPCALL FindGridExt() {
-	//old code - didn't work right
-	BgnPExtents();
-	DLScan(NULL, FindGridEntities, DLS_UNLK | DLS_HSHTOK | DLS_NOWDC | DLS_RO, 0, 0);
-	EndPExtents(&GridExt);
-}
-
-void XPCALL HandleExc(const int Result, int Result2, int Result3)
-{
-	if (Result != X_OK) { CmdEnd(); return; }
-	UNREFERENCED_PARAMETER(Result2);
-	UNREFERENCED_PARAMETER(Result3);
-
-	CmdEnd();
-}
-
-
-// Finds all entities that are on the GRID layer for the extents check
-pENTREC XPCALL FindGridEntities(hDLIST list, pENTREC entity, const DWORD parm1, DWORD parm2) {
-
-	int layer = GetLayerNr("HEX/SQUARE GRID");
-	//int layer = GetLayerNr("BACKGROUND (MAP)");
-	//int layer = GetLayerNr("MAP BORDER");
-
-	if (entity->CStuff.ELayer == layer) {
-		EXCheck(entity);
-	}
-
-	return 0;
-}
-
-
 
 
 
@@ -153,8 +109,14 @@ pENTREC XPCALL FindGridEntities(hDLIST list, pENTREC entity, const DWORD parm1, 
 // basically all we need now is a bounding box for the part of the map that's on the grid
 // this will be what we export as an image and also what we use to calculate the wall positions in Foundry
 void SetParameters() {
+	GetBB(); //prompts the user for a bounding box
+	//we can call GetBB every time the user invokes any of our commands
+	FORMSTPKT(BBFPkt, "Back in SetParameters...\n(!01)\n(!02)\0", 2)
+		ITEMFMT(boundingbox.p1, FT_2dC4, FJ_Var, 1, 0)
+		ITEMFMT(boundingbox.p2, FT_2dC4, FJ_Var, 1, 0)
+		FORMSTEND
 
-	//FindGridExt();
+		FormSt(&BBFPkt, RSC(FD_MsgBox));
 	widthFeet = boundingbox.p2.x - boundingbox.p1.x;
 	heightFeet = boundingbox.p2.y - boundingbox.p1.y;
 	widthPixels = widthFeet * feetToPixels;
@@ -163,13 +125,16 @@ void SetParameters() {
 
 void XPCALL ExportWalls() {
 	
+	//SetParameters();							//calculates and sets parameters which determine height, width, scale, etc. of wall canvas
+	
+	//currently the problem is that it's executing the next part before finishing the user prompt
+
 	std::string filePath = GetSaveFilePath();	//prompt user to choose an export file name and path
 													
 	if (!filePath.empty()) {					//if they selected one, proceed with the export	
 
 		wallsJSON = "";							//ensure holder for JSON is empty at the start
 		
-		SetParameters();						//calculates and sets parameters which determine height, width, scale, etc. of wall canvas
 		AppendSceneName();						//adds beginning matter to wallsJSON (scene name, height, width, scale)
 		
 		wallsJSON.append("  \"walls\": [");		//start the walls entry
@@ -203,26 +168,29 @@ void XPCALL ExportWalls() {
 // uses the export jpeg rectangle function to export only a selected rectangle
 // We only want to export what's on the grid so our map will match up with the grid on the VTT
 // So we use SetParameters to assign values to GridExt:
-//  GridExt.p1 is the lower left point of the grid
-//  GridExt.p2 is the upper right point of the grid
+//  boundingbox.p1 is the lower left point of the grid
+//  boundingbox.p2 is the upper right point of the grid
 // Then we format the command as a string, cast it as a cstring, and call it
 //
 void XPCALL ExportRect() {
-	SetParameters();
+	//SetParameters();
 	//need to compose the command as a string
 	std::string scriptText = "";
 	scriptText.append("WBS ");
-	scriptText.append(std::to_string(GridExt.p1.x));
+	scriptText.append(std::to_string(boundingbox.p1.x));
 	scriptText.append(",");
-	scriptText.append(std::to_string(GridExt.p1.y));
+	scriptText.append(std::to_string(boundingbox.p1.y));
 	scriptText.append(" ");
-	scriptText.append(std::to_string(GridExt.p2.x));
+	scriptText.append(std::to_string(boundingbox.p2.x));
 	scriptText.append(",");
-	scriptText.append(std::to_string(GridExt.p2.y));
+	scriptText.append(std::to_string(boundingbox.p2.y));
 	scriptText.append(";");
 	char* cstr = const_cast<char*>(scriptText.c_str());
 	//FormSt(&cstr, RSC(FD_MsgBox));
-	ExecScriptCopy(cstr); 
+	ExecScriptCopy(cstr);
+	FORMST(MyAPkt, "Success\n\n"
+		"Map image file saved successfully."
+	)
 	CmdEnd();
 }
 
@@ -312,24 +280,30 @@ void ProcessWallEntity(const pENTREC entity) {
 	//need to check wall type and make sure it has nodes and stuff
 	//Path.Path.Count isn't working for this
 	//do something else to prevent it from crashing when it tries to run on a line, arc, or multipoly
-	if (entity->Path.Path.Count > 0) //make sure it's not empty
+
+
+	if (entity->Path.Path.EParm < 30000)
 	{
-		for (int i = 0; i < entity->Path.Path.Count -1; i++) {
-			//construct the ith wall
-			MakeWall(entity, i, i + 1);
-		}
-		if (entity->Path.Path.Count == entity->Path.Path.EParm) //if it's closed
+		if (entity->Path.Path.Count > 0) //make sure it's not empty
 		{
-			MakeWall(entity, 0, entity->Path.Path.Count);
+			for (int i = 0; i < entity->Path.Path.Count - 1; i++) {
+				//construct the ith wall
+				MakeWall(entity, i, i + 1);
+			}
+			if (entity->Path.Path.Count == entity->Path.Path.EParm) //if it's closed
+			{
+				MakeWall(entity, 0, entity->Path.Path.Count - 1);
+			}
 		}
+		//testing:
+		// this currently works when all the walls are PATH or POLYGON
+		// There are also:
+		// LINE
+		// ARC
+		// MULTIPOLY
+		//
+
 	}
-	//testing:
-	// this currently works when all the walls are PATH or POLYGON
-	// There are also:
-	// LINE
-	// ARC
-	// MULTIPOLY
-	//
 }
 
 
@@ -338,10 +312,10 @@ void ProcessWallEntity(const pENTREC entity) {
 // the wall will stretch from the node at index node1 to the node at index node2
 //
 void MakeWall(const pENTREC entity, int node1, int node2) {
-	int x1 = entity->Path.Path.Nodes[node1].x * feetToPixels;
-	int y1 = heightPixels - (entity->Path.Path.Nodes[node1].y * feetToPixels);
-	int x2 = entity->Path.Path.Nodes[node2].x * feetToPixels;
-	int y2 = heightPixels - (entity->Path.Path.Nodes[node2].y * feetToPixels);
+	int x1 = (entity->Path.Path.Nodes[node1].x - boundingbox.p1.x ) * feetToPixels;
+	int y1 = heightPixels - ((entity->Path.Path.Nodes[node1].y - boundingbox.p1.y) * feetToPixels);
+	int x2 = (entity->Path.Path.Nodes[node2].x - boundingbox.p1.x) * feetToPixels;
+	int y2 = heightPixels - ((entity->Path.Path.Nodes[node2].y - boundingbox.p1.y) * feetToPixels);
 	wallsJSON.append(GetWallText(x1, y1, x2, y2));
 }
 
