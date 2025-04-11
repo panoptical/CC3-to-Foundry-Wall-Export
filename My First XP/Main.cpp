@@ -1,0 +1,301 @@
+#include "Main.h"
+
+
+char CList[] = "DEMO\0TESTNEWFUNCTIONS\0EXPORTWALLS\0EXPORTWALLMAP\0";
+PCMDPROC PList[] = { About, Demo, TestNewFunctions, ExportWalls, ExportRect };
+
+XP MyXP = { 0, CList, PList, 0, 0, 0, XPID, 0, 620, 0, 0, 620 };
+
+
+/////////////  DllMain - XP initialization & Unload code //////////////
+BOOL WINAPI DllMain(const HINSTANCE hDLL, const DWORD dwReason, LPVOID lpReserved) {
+	UNREFERENCED_PARAMETER(lpReserved);
+
+	switch (dwReason)
+	{
+	case DLL_PROCESS_ATTACH:
+		MyXP.ModHdl = hDLL;
+		_XPRegCmd(&MyXP);
+		break;
+	case DLL_PROCESS_DETACH:
+		_XPUnregCmd(&MyXP);
+		break;
+	default:
+		break;
+	}
+	return TRUE;
+}
+
+
+void XPCALL About() {
+
+	FORMST(MyAPkt, "CC3+ XP Template 2022\n\n"
+		"About box for CC3+ XP Template 2022"
+	)
+
+	FormSt(&MyAPkt, RSC(FD_MsgBox));
+	CmdEnd();
+}
+
+char name[50];
+char SceneName[50];
+
+void XPCALL SayHello(const int Result, int Result2, int Result3)
+{
+	if (Result != X_OK) { CmdEnd(); return; }
+	UNREFERENCED_PARAMETER(Result2);
+	UNREFERENCED_PARAMETER(Result3);
+
+	FORMSTPKT(MyFPkt, "Hi, !01\nHave a Nice Day\0", 1)
+		ITEMFMT(name, FT_Stg, FJ_Var, 0, 0)
+		FORMSTEND
+
+		FormSt(&MyFPkt, RSC(FD_MsgBox));
+	CmdEnd();
+}
+
+void XPCALL Demo() {
+	FORMST(lpszPrompt, "Your Name:\0")
+
+		RDATA NameReq =
+	{ sizeof(RDATA), RD_TxWord, NULL, RDF_C, (DWORD*)&name,
+		(DWORD*)&lpszPrompt,RDC_ARROW, SayHello, NULL, NULL, 0, NULL, 0 };
+
+	ReqData(&NameReq);
+}
+
+void XPCALL TestNewFunctions() {
+	std::string filePath = GetSaveFilePath();
+	if (!filePath.empty()) {
+		SaveTextToFile(filePath, "Hello, this is a test text saved to a file!");
+
+		FORMST(MyAPkt, "Success\n\n"
+			"File saved successfully."
+		)
+			FormSt(&MyAPkt, RSC(FD_MsgBox));
+	}
+	else {
+		FORMST(MyAPkt, "Error\n\n"
+			"File save operation was cancelled."
+		)
+			FormSt(&MyAPkt, RSC(FD_MsgBox));
+			// Handle the case where the user cancels the file save dialog
+			// You can show a message or take any other action as needed
+	}
+	CmdEnd();    
+}
+
+std::string wallsJSON = "";
+int feetToPixels = 20; //to do: check for this programmatically
+int p1x, p1y, p2x, p2y;
+int widthFeet, heightFeet, widthPixels, heightPixels;
+
+//stores the extent of the map grid. p1 = lower left, p2 = upper right
+GLINE3 GridExt;
+
+void FindGridExt() {
+	BgnPExtents();
+	DLScan(NULL, FindGridEntities, DLS_UNLK | DLS_HSHTOK | DLS_NOWDC | DLS_RO, 0, 0);
+	EndPExtents(&GridExt);
+}
+
+// Finds all entities that are on the GRID layer for the extents check
+pENTREC XPCALL FindGridEntities(hDLIST list, pENTREC entity, const DWORD parm1, DWORD parm2) {
+
+	int layer = GetLayerNr("HEX/SQUARE GRID");
+
+	if (entity->CStuff.ELayer == layer) {
+		EXCheck(entity);
+	}
+
+	return 0;
+}
+
+void SetParameters() {
+	//get grid entity
+	//calculate extent
+	FindGridExt();
+	widthFeet = GridExt.p2.x - GridExt.p1.x;
+	heightFeet = GridExt.p2.y - GridExt.p1.y;
+	widthPixels = widthFeet * feetToPixels;
+	heightPixels = heightFeet * feetToPixels;
+	//why is this coming out to 84x8???
+}
+
+void XPCALL ExportWalls() {
+	SetParameters();
+	AppendSceneName();
+	wallsJSON.append("  \"walls\": [");
+	std::string filePath = GetSaveFilePath();
+	if (!filePath.empty()) {
+		wallsJSON.append(GetWallsJSON());
+		wallsJSON.pop_back();
+		wallsJSON.append("]\n}");
+		SaveTextToFile(filePath, wallsJSON);
+		FORMST(MyAPkt, "Success\n\n"
+			"File saved successfully."
+		)
+			FormSt(&MyAPkt, RSC(FD_MsgBox));
+	}
+	else {
+		FORMST(MyAPkt, "Error\n\n"
+			"File save operation was cancelled."
+		)
+			FormSt(&MyAPkt, RSC(FD_MsgBox));
+		// Handle the case where the user cancels the file save dialog
+		// You can show a message or take any other action as needed
+	}
+
+	CmdEnd();
+}
+
+
+
+
+void XPCALL ExportRect() {
+	SetParameters();
+	//need to compose the command as a string
+	std::string scriptText = "";
+	scriptText.append("WBS ");
+	scriptText.append(std::to_string(GridExt.p1.x));
+	scriptText.append(",");
+	scriptText.append(std::to_string(GridExt.p1.y));
+	scriptText.append(" ");
+	scriptText.append(std::to_string(GridExt.p2.x));
+	scriptText.append(",");
+	scriptText.append(std::to_string(GridExt.p2.y));
+	scriptText.append(";");
+	char* cstr = const_cast<char*>(scriptText.c_str());
+	//FormSt(&cstr, RSC(FD_MsgBox));
+	ExecScriptCopy(cstr); 
+	CmdEnd();
+}
+
+//add the scene name to the json file
+//to do: allow the user to set this?
+//or set it based on the file name?
+//to do: append all scene details, like size (maybe using border extent), padding, etc.
+void XPCALL AppendSceneName()
+{
+	//append name
+	wallsJSON.append("{\n  \"name\": \"");
+	wallsJSON.append("Walls Export Demo");
+	wallsJSON.append("\",\n");
+	//append width
+	wallsJSON.append("  \"width\": ");
+	wallsJSON.append(std::to_string(widthPixels));
+	wallsJSON.append(",\n");
+	//append height
+ 	wallsJSON.append("  \"height\": ");
+	wallsJSON.append(std::to_string(heightPixels));
+	wallsJSON.append(",\n");
+	//append padding
+	wallsJSON.append("  \"padding\": 0,\n");
+
+	CmdEnd();
+}
+
+
+//the main function where we're going to have to find the walls
+//to do: scan the drawing list for walls
+//  - walls are stored with sets of nodes
+//  - call GetWallText on each pair of nodes
+//  - append to result
+//  - going to have to refactor this a bit to work with the callback function
+// no - make this the callback function - call it on each wall entity! (can a callback function return something?)
+// create a wrapper function for the DLScan and change the function call in ExportWalls (fifth line)
+//
+
+std::string GetWallsJSON() {
+	std::string result = "";
+	int x1, y1, x2, y2;
+	x1 = y1 = 100;
+	x2 = y2 = 200;
+
+	result.append(GetWallText(x1, y1, x2, y2));
+
+
+	return result;
+}
+
+//GetWallText
+//Given x and y coordinates of a wall, returns a string containining a correctly formatted entry for a walls array in Foundry json format
+//entry has a trailing comma - will need to delete the comma from the final entry, or remove it from here and add it between 
+// entries in the wrapper function
+std::string GetWallText(const int x1, const int y1, const int x2, const int y2) {
+	std::string result = "";
+	result.append("{\n      \"light\": 20,\n      \"sight\": 20,\n      \"sound\": 20,\n      \"move\": 20,\n      \"c\": [\n        ");
+	result.append(std::to_string(x1));
+	result.append(",\n        ");
+	result.append(std::to_string(y1));
+	result.append(",\n        ");
+	result.append(std::to_string(x2));
+	result.append(",\n        ");
+	result.append(std::to_string(y2));
+	result.append("\n      ],\n      \"_id\": \"");
+	result.append(random_string(16));
+	result.append("\",\n      \"dir\": 0,\n      \"door\": 0,\n      \"ds\": 0,\n      \"threshold\": {\n");
+	result.append("        \"light\": null,\n        \"sight\": null,\n        \"sound\": null,\n        \"attenuation\": false\n      },\n");
+	result.append("      \"flags\": {}\n    },");
+	return result;
+}
+
+
+//basic file output function
+//made with copilot
+void SaveTextToFile(const std::string& filePath, const std::string& text) {
+	std::ofstream outFile(filePath); // Open the file for writing
+	if (outFile.is_open()) {
+		outFile << text; // Write the text to the file
+		outFile.close(); // Close the file
+	}
+	else {
+		// Handle error if the file cannot be opened
+		FORMST(MyAPkt, "Error: Unable to open file for writing.\n")
+			FormSt(&MyAPkt, RSC(FD_MsgBox));
+	}
+}
+
+//basic dialog to let the user select an export file
+//made with copilot
+std::string GetSaveFilePath() {
+	char fileName[MAX_PATH] = ""; // Buffer to store the selected file path
+	OPENFILENAME ofn;             // Structure to configure the file dialog
+	ZeroMemory(&ofn, sizeof(ofn)); // Initialize the structure to zero
+
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = NULL; // No owner window
+	ofn.lpstrFilter = "Text Files\0*.txt\0All Files\0*.*\0"; // File type filters
+	ofn.lpstrFile = fileName;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.Flags = OFN_OVERWRITEPROMPT; // Prompt if the file already exists
+	ofn.lpstrDefExt = "txt";         // Default file extension
+
+	if (GetSaveFileName(&ofn)) {
+		return std::string(fileName); // Return the selected file path
+	}
+	else {
+		return ""; // Return an empty string if the user cancels
+	}
+}
+
+// generates a random string
+// call this with length 16 to generate wall IDs
+// from https://github.com/InversePalindrome/Blog/tree/master/RandomString
+std::string random_string(std::size_t length)
+{
+	const std::string characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+	std::random_device random_device;
+	std::mt19937 generator(random_device());
+	std::uniform_int_distribution<> distribution(0, characters.size() - 1);
+
+	std::string random_string;
+
+	for (std::size_t i = 0; i < length; ++i)
+	{
+		random_string += characters[distribution(generator)];
+	}
+
+	return random_string;
+}
