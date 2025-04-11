@@ -232,11 +232,11 @@ void XPCALL AppendSceneName()
 void GetWallsJSON() {
 
 	// fake data for testing 
-	//int x1, y1, x2, y2;
-	//x1 = y1 = 100;
-	//x2 = y2 = 200;
+	int x1, y1, x2, y2;
+	x1 = y1 = 100;
+	x2 = y2 = 200;
 	// fake call for testing
-	//wallsJSON.append(GetWallText(x1, y1, x2, y2));
+	wallsJSON.append(GetWallText(x1, y1, x2, y2));
 
 	//1. Write the callback function that actually processes each entity
 	//2. Write the DLScan command here:

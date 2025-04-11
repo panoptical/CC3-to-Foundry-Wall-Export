@@ -17,9 +17,12 @@ void XPCALL ExportRect(void);
 void SaveTextToFile(const std::string& filename, const std::string& text);
 void SetParameters(void);
 void FindGridExt(void);
+void ProcessWallEntity(const pENTREC entity);
+void MakeWall(const pENTREC entity, int node1, int node2);
 pENTREC XPCALL FindGridEntities(hDLIST list, pENTREC entity, const DWORD parm1, DWORD parm2);
+pENTREC XPCALL ProcessWall(hDLIST list, const pENTREC entity, const DWORD parm1, DWORD parm2);
 std::string GetSaveFilePath();
-std::string GetWallsJSON(void);
+void GetWallsJSON(void);
 std::string GetWallText(const int, const int, const int, const int);
 std::string random_string(std::size_t length);
 
