@@ -9,6 +9,10 @@ Currently, this only works with walls created as WALLS in CC3. It won't import d
 Currently, this only works with the most common wall types: POLY and PATH walls (what you get from drawing standard walls and rooms).
 At this time, the program will crash if you try to use it to import walls stored as ARC or other less common wall types. Sorry! I'm working on a fix for that next.
 
+Installation instructions
+1. Download the latest release
+2. Copy the DLL into your CC3 installation directory (the one with fcw32.exe in it)
+
 Instructions for use:
 
 1. Ensure Snap to Grid is enabled (Tools -> Snaps -> Grid Settings, and tick Grid, Snap, and Cursor Snap)
