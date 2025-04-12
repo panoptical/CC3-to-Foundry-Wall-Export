@@ -30,13 +30,13 @@ Now you have a corresponding Foundry-compatible json scene file and background i
 6. Adjust settings as needed.
 7. Remember, importing the json file will completely overwrite any changes and reset the whole scene, so only use it on a new/blank scene.
 
-Demo videos: https://drive.google.com/drive/folders/1AZ3uaWhoU-ab9qpQiof5TLknScci1_VN?usp=sharing
 
-Full Map Export: https://drive.google.com/file/d/1fqJ8fO8QLDlDUXDk6V_JTNZOid_3UPi1/view?usp=drive_link
-[Export Full.webm](https://github.com/user-attachments/assets/ae289075-657d-4e75-88d2-adf5c4c9fd99)
 
-Cropped Map Export: https://drive.google.com/file/d/1x1jT7bKJI9dEUCjlMg_rmDlE9KpwMU9r/view?usp=sharing
 
+https://github-production-user-asset-6210df.s3.amazonaws.com/1449165/433011980-ae289075-657d-4e75-88d2-adf5c4c9fd99.webm?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20250412%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250412T054706Z&X-Amz-Expires=300&X-Amz-Signature=e6a6cbaa7e39c473919e1051eae591e6fa5af766be87162923c2766699bfede0&X-Amz-SignedHeaders=host
+
+
+[Export Crop.webm](https://github.com/user-attachments/assets/3b33e441-e2fe-43ea-b277-c76fb2fc6fea)
 
 FAQ
 1. Q. What if I want scene padding?
@@ -48,4 +48,11 @@ FAQ
 
 3. Q. This is really helpful? Can I give you money?
    A. This work is completely free, but if you'd like to buy me a coffee, you can do so here: https://ko-fi.com/nealzupancic
+   You can also sign up for one of my online RPGs at [StartPlaying.games](https://startplaying.games/gm/ninesides)
 
+Credits
+
+Thanks to [Profantasy](https://www.profantasy.com/) for making CC3 - a lovely mapmaking suite.
+Thanks to Remy Monsen for his [tutorials](https://rpgmaps.profantasy.com/xp-tutorials/) on writing addons for CC3.
+
+File output functions for Windows were created with the help of GitHub Copilot.
