@@ -14,8 +14,9 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <ProjectGuid>{8e68df80-ebae-4dbe-95b6-5980dee5a52f}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>My_First_XP</RootNamespace>
+    <RootNamespace>CC3FoundryExport</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>CC3FoundryExport</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
